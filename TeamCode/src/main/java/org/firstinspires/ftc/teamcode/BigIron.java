@@ -21,23 +21,18 @@ public class BigIron extends LinearOpMode
 
     // Vars
     double slowDriveFactor = 1.0;
+    int towerGoalPositionBottom = 1200;
+    int towerGoalPositionMiddle = 1240;
+    int towerGoalPositionTop = 1290;
 
     @Override
     public void runOpMode() throws InterruptedException
     {
-        // Setup motors and servos
-        launchMotor = hardwareMap.dcMotor.get("launchMotor");
-        liftMotor = hardwareMap.dcMotor.get("liftMotor");
-        feedServo = hardwareMap.servo.get("feedServo");
-        clawServo = hardwareMap.servo.get("clawServo");
+        // Setup and zero robot
+        setupMotorsAndServos();
+        zeroLiftEncoder();
 
-        leftFrontMotor = hardwareMap.dcMotor.get("leftFrontMotor");
-        rightFrontMotor = hardwareMap.dcMotor.get("rightFrontMotor");
-        leftFrontMotor.setDirection(DcMotor.Direction.REVERSE);
-        rightFrontMotor.setDirection(DcMotor.Direction.REVERSE);
-        leftRearMotor = hardwareMap.dcMotor.get("leftRearMotor");
-        rightRearMotor = hardwareMap.dcMotor.get("rightRearMotor");
-
+        // Wait for the captain to press start on the cell phone
         waitForStart();
 
         while (opModeIsActive()) {
@@ -76,13 +71,11 @@ public class BigIron extends LinearOpMode
             leftRearMotor.setPower(motorBL * slowDriveFactor);
             rightRearMotor.setPower(motorBR * slowDriveFactor);
 
-
-
-
-
-
             // Service right hand operation of BIG IRON
             if (gamepad1.y) {
+                // Lift launcher into top position
+                liftToEncoderPosition(towerGoalPositionTop);
+
                 // Move claw servo to home position
                 clawServo.setPosition(0);
 
@@ -90,13 +83,13 @@ public class BigIron extends LinearOpMode
                 launchMotor.setPower(-1.0);
 
                 // Wait 1 second before launching ring to get launch motor up to full speed
-                sleep(1000);
+                sleep(2000);
 
                 // Push ring into launcher with feed servo
                 feedServo.setPosition(0.5);
             } else if (gamepad1.a) {
                 // Put feed servo into zero position
-                feedServo.setPosition(0.35);
+                feedServo.setPosition(0.31);
 
                 // Feed ring into launcher with claw servo
                 clawServo.setPosition(0.5);
@@ -118,5 +111,51 @@ public class BigIron extends LinearOpMode
 
             idle();
         }
+    }
+
+    public void setupMotorsAndServos()
+    {
+        // Setup motors and servos
+        launchMotor = hardwareMap.dcMotor.get("launchMotor");
+        liftMotor = hardwareMap.dcMotor.get("liftMotor");
+        liftMotor.setDirection(DcMotor.Direction.REVERSE);
+        feedServo = hardwareMap.servo.get("feedServo");
+        clawServo = hardwareMap.servo.get("clawServo");
+
+        leftFrontMotor = hardwareMap.dcMotor.get("leftFrontMotor");
+        rightFrontMotor = hardwareMap.dcMotor.get("rightFrontMotor");
+        leftFrontMotor.setDirection(DcMotor.Direction.REVERSE);
+        rightFrontMotor.setDirection(DcMotor.Direction.REVERSE);
+        leftRearMotor = hardwareMap.dcMotor.get("leftRearMotor");
+        rightRearMotor = hardwareMap.dcMotor.get("rightRearMotor");
+    }
+    public void zeroLiftEncoder()
+    {
+        // Send telemetry message to signify robot waiting;
+        telemetry.addData("Status", "Resetting Encoders");
+        telemetry.update();
+        liftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        // Send telemetry message to indicate successful Encoder reset
+        telemetry.addData("LiftMotor",  "Starting at: %7d",
+                liftMotor.getCurrentPosition());
+        telemetry.update();
+        liftMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+    }
+
+    public void liftToEncoderPosition(int position)
+    {
+        liftMotor.setTargetPosition(position);
+        liftMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        liftMotor.setPower(1.0);
+
+        while (opModeIsActive() && liftMotor.isBusy()) {
+            telemetry.addData("LiftMotor",  "Starting at: %7d",
+                    liftMotor.getCurrentPosition());
+            telemetry.update();
+            idle();
+        }
+        liftMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        liftMotor.setPower(0.1);
     }
 }
