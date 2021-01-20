@@ -13,6 +13,7 @@ public class BigIron extends LinearOpMode
     private DcMotor liftMotor;
     private Servo feedServo;
     private Servo clawServo;
+    private Servo wobbleServo;
 
     private DcMotor leftFrontMotor;
     private DcMotor rightFrontMotor;
@@ -30,7 +31,7 @@ public class BigIron extends LinearOpMode
     {
         // Setup and zero robot
         setupMotorsAndServos();
-        zeroLiftEncoder();
+        zeroRobot();
 
         // Wait for the captain to press start on the cell phone
         waitForStart();
@@ -70,6 +71,12 @@ public class BigIron extends LinearOpMode
             rightFrontMotor.setPower(motorFR * slowDriveFactor);
             leftRearMotor.setPower(motorBL * slowDriveFactor);
             rightRearMotor.setPower(motorBR * slowDriveFactor);
+            if (gamepad2.y) {
+                wobbleServo.setPosition(50);
+            }
+            else if (gamepad2.a) {
+                wobbleServo.setPosition(0);
+            }
 
             // Service right hand operation of BIG IRON
             if (gamepad1.y) {
@@ -121,6 +128,7 @@ public class BigIron extends LinearOpMode
         liftMotor.setDirection(DcMotor.Direction.REVERSE);
         feedServo = hardwareMap.servo.get("feedServo");
         clawServo = hardwareMap.servo.get("clawServo");
+        wobbleServo = hardwareMap.servo.get("wobbleServo");
 
         leftFrontMotor = hardwareMap.dcMotor.get("leftFrontMotor");
         rightFrontMotor = hardwareMap.dcMotor.get("rightFrontMotor");
@@ -157,5 +165,10 @@ public class BigIron extends LinearOpMode
         }
         liftMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         liftMotor.setPower(0.1);
+    }
+    public void zeroRobot()
+    {
+        wobbleServo.setPosition(0);
+        zeroLiftEncoder();
     }
 }
