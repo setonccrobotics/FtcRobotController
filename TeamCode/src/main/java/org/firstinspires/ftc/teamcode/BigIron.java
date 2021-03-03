@@ -4,16 +4,16 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 
 @TeleOp(name = "BigIron", group = "SCC")
 public class BigIron extends LinearOpMode
 {
     // Create motor and servo objects
-    private DcMotor launchMotor;
+    private DcMotorEx launchMotor;
     private DcMotor liftMotor;
     private Servo feedServo;
     private Servo clawServo;
-    private Servo wobbleServo;
 
     private DcMotor leftFrontMotor;
     private DcMotor rightFrontMotor;
@@ -22,16 +22,23 @@ public class BigIron extends LinearOpMode
 
     // Vars
     double slowDriveFactor = 1.0;
-    int towerGoalPositionBottom = 1200;
-    int towerGoalPositionMiddle = 1240;
-    int towerGoalPositionTop = 1290;
+    //int towerGoalPosition = 670;
+    int towerGoalPosition = 685;
+    double clawHomePosition = 0.1;
+    double clawFeedPosition = 0.8;
+    double clawRestPosition = 0.4;
+
+    double tempServoPos = clawHomePosition;
 
     @Override
     public void runOpMode() throws InterruptedException
     {
         // Setup and zero robot
         setupMotorsAndServos();
-        zeroRobot();
+        zeroLiftEncoder();
+        feedServo.setPosition(0.1);
+        clawServo.setPosition(clawHomePosition);
+        launchMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         // Wait for the captain to press start on the cell phone
         waitForStart();
@@ -71,40 +78,67 @@ public class BigIron extends LinearOpMode
             rightFrontMotor.setPower(motorFR * slowDriveFactor);
             leftRearMotor.setPower(motorBL * slowDriveFactor);
             rightRearMotor.setPower(motorBR * slowDriveFactor);
-            if (gamepad2.y) {
-                wobbleServo.setPosition(50);
+
+            /*if (gamepad1.b) {
+                // Debug servo
+                tempServoPos += 0.1;
+                clawServo.setPosition(tempServoPos);
+                sleep(1000); //Poorman's debounce
+            } else if (gamepad1.x) {
+                tempServoPos -= 0.1;
+                clawServo.setPosition(tempServoPos);
+                sleep(1000); //Poorman's debounce
             }
-            else if (gamepad2.a) {
-                wobbleServo.setPosition(0);
+            telemetry.addData("tempServoPos",  "%.3f", tempServoPos);
+            telemetry.update();*/
+            if (gamepad1.b) {
+                // Debug servo
+                towerGoalPosition += 5;
+                sleep(500); //Poorman's debounce
+            } else if (gamepad1.x) {
+                towerGoalPosition -= 5;
+                sleep(500); //Poorman's debounce
             }
+            updateTelemetry();
 
             // Service right hand operation of BIG IRON
             if (gamepad1.y) {
                 // Lift launcher into top position
-                liftToEncoderPosition(towerGoalPositionTop);
+                liftToEncoderPosition(towerGoalPosition);
 
                 // Move claw servo to home position
-                clawServo.setPosition(0);
+                clawServo.setPosition(clawHomePosition);
 
                 // Turn launch motor on to fire ring
-                launchMotor.setPower(-1.0);
-
-                // Wait 1 second before launching ring to get launch motor up to full speed
-                sleep(2000);
+                //launchMotor.setPower(-1.0);
+                launchMotor.setVelocity(-2200.0);
+                while (launchMotor.getVelocity() > -2200) {
+                    sleep(20);
+                }
+                updateTelemetry();
 
                 // Push ring into launcher with feed servo
-                feedServo.setPosition(0.5);
+                feedServo.setPosition(0.4);
             } else if (gamepad1.a) {
                 // Put feed servo into zero position
-                feedServo.setPosition(0.31);
-
-                // Feed ring into launcher with claw servo
-                clawServo.setPosition(0.5);
+                feedServo.setPosition(0.1);
 
                 // Pick up ring by starting launch motor in reverse
-                launchMotor.setPower(1.0);
+                //launchMotor.setPower(1.0);
+                launchMotor.setVelocity(2200);
+                while (launchMotor.getVelocity() < 2200) {
+                    sleep(20);
+                }
+                updateTelemetry();
+
+                // Feed ring into launcher with claw servo
+                clawServo.setPosition(clawFeedPosition);
+
+                // Wait 1 second before launching ring to get launch motor up to full speed
+                sleep(500);
             } else {
-                launchMotor.setPower(0);
+                //launchMotor.setPower(0);
+                launchMotor.setVelocity(0.0);
             }
 
             // Service left hand operation of BIG IRON
@@ -123,12 +157,11 @@ public class BigIron extends LinearOpMode
     public void setupMotorsAndServos()
     {
         // Setup motors and servos
-        launchMotor = hardwareMap.dcMotor.get("launchMotor");
+        launchMotor = hardwareMap.get(DcMotorEx.class, "launchMotor");
         liftMotor = hardwareMap.dcMotor.get("liftMotor");
         liftMotor.setDirection(DcMotor.Direction.REVERSE);
         feedServo = hardwareMap.servo.get("feedServo");
         clawServo = hardwareMap.servo.get("clawServo");
-        wobbleServo = hardwareMap.servo.get("wobbleServo");
 
         leftFrontMotor = hardwareMap.dcMotor.get("leftFrontMotor");
         rightFrontMotor = hardwareMap.dcMotor.get("rightFrontMotor");
@@ -144,10 +177,6 @@ public class BigIron extends LinearOpMode
         telemetry.update();
         liftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        // Send telemetry message to indicate successful Encoder reset
-        telemetry.addData("LiftMotor",  "Starting at: %7d",
-                liftMotor.getCurrentPosition());
-        telemetry.update();
         liftMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
     }
 
@@ -158,17 +187,18 @@ public class BigIron extends LinearOpMode
         liftMotor.setPower(1.0);
 
         while (opModeIsActive() && liftMotor.isBusy()) {
-            telemetry.addData("LiftMotor",  "Starting at: %7d",
-                    liftMotor.getCurrentPosition());
-            telemetry.update();
+            updateTelemetry();
             idle();
         }
         liftMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         liftMotor.setPower(0.1);
     }
-    public void zeroRobot()
+
+    public void updateTelemetry()
     {
-        wobbleServo.setPosition(0);
-        zeroLiftEncoder();
+        telemetry.addData("towerGoalPosition", towerGoalPosition);
+        telemetry.addData("launchMotorVelocity", launchMotor.getVelocity());
+        telemetry.addData("liftMotorPosition", liftMotor.getCurrentPosition());
+        telemetry.update();
     }
 }
